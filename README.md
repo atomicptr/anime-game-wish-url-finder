@@ -5,8 +5,10 @@ on Linux. Intended to be used with wish aggregation websites like [paimon.moe](h
 
 ## How to run
 
+Copy the following code and paste it into your terminal:
+
 ```bash
-$ curl -SsL https://raw.githubusercontent.com/atomicptr/anime-game-wish-url-finder/master/main.py | python3
+curl -SsL https://raw.githubusercontent.com/atomicptr/anime-game-wish-url-finder/master/main.py | python3
 ```
 
 ## License

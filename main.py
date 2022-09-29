@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 import re
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlencode, unquote, urlunparse
 from operator import itemgetter
 from typing import Optional
+from requests import get as http_get
+import json
+
 
 DEBUG_MODE = False
 
 ANIME_GAME_NAME = "".join(["Ge", "nshi", "n I", "mpact"])
 
 INSTALL_LOCATIONS = [
+    # Anime Game Launcher
+    "~/.local/share/anime-game-launcher/game/drive_c/Program Files/%s" % ANIME_GAME_NAME,
+    # Anime Game Launcher GTK
+    "~/.local/share/anime-game-launcher-gtk/game/drive_c/Program Files/%s" % ANIME_GAME_NAME,
     # Anime Game Launcher GTK - Flatpak
     "~/.var/app/moe.launcher.an-anime-game-launcher-gtk/data/anime-game-launcher/game/drive_c/Program Files/%s" % ANIME_GAME_NAME,
     # Anime Game Launcher - Flatpak
@@ -23,7 +30,9 @@ UID_REGEX = r"\"uid\":\"([0-9]+)\""
 
 URL_REGEX = r"https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
 
-GACHA_ENDPOINT = "e20190909gacha-v2"
+GACHA_ENDPOINT = "event/gacha_info/api/getGachaLog"
+
+TIME_CUTOFF_MINUTES = 15
 
 
 def find_url(path: Path) -> [Optional[str], Optional[str]]:
@@ -42,21 +51,47 @@ def find_url(path: Path) -> [Optional[str], Optional[str]]:
     for url in urls:
         if GACHA_ENDPOINT not in url:
             continue
-        parsed_url = urlparse(url)
-        query_params = parse_qs(parsed_url.query)
 
-        timestamp = -1
-
-        if "timestamp" in query_params:
-            timestamp = int(query_params["timestamp"][0])
-
-        matching_urls.append([timestamp, url])
-
-    if len(matching_urls) > 0:
-        newest = sorted(matching_urls, key=itemgetter(0))[0]
-        return [uid, newest[1]]
+        if test_url(url):
+            return [uid, url]
 
     return [uid, None]
+
+
+def test_url(url: str) -> bool:
+    parsed_url = urlparse(url)
+    query_params = parse_qs(parsed_url.query)
+
+    query_params["lang"] = "en"
+    query_params["gacha_type"] = 301
+    query_params["size"] = "5"
+
+    test_url = urlunparse(
+        (
+            parsed_url.scheme,
+            parsed_url.netloc,
+            "/event/gacha_info/api/getGachaLog",
+            parsed_url.params,
+            urlencode(query_params, doseq=True),
+            None,
+        )
+    )
+
+    res = http_get(
+        test_url,
+        headers={
+            "Content-Type": "application/json",
+        },
+        timeout=10,
+        allow_redirects=True
+    )
+
+    if res.status_code != 200:
+        return False
+
+    json_res = json.loads(res.text)
+
+    return json_res["retcode"] == 0
 
 
 def print_result(uid: Optional[str], url: str):
@@ -67,6 +102,8 @@ def print_result(uid: Optional[str], url: str):
 
 
 def main():
+    found_result = False
+
     for install_location in INSTALL_LOCATIONS:
         install_location = Path(install_location).expanduser()
 
@@ -89,7 +126,13 @@ def main():
         if url is None:
             continue
 
+        found_result = True
+
         print_result(uid, url)
+
+    if not found_result:
+        print("Could not find result, please log into the game, open your wish history and try again.")
+        exit(1)
 
 
 if __name__ == "__main__":
