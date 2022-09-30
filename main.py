@@ -11,7 +11,7 @@ from requests import get as http_get
 
 
 DEBUG_MODE = False
-ANIME_GAME_NAME = b64decode("R2Vuc2hpbiBJbXBhY3Q=")
+ANIME_GAME_NAME = b64decode("R2Vuc2hpbiBJbXBhY3Q=").decode("utf-8")
 INSTALL_LOCATIONS = [
     # Anime Game Launcher
     f"~/.local/share/anime-game-launcher/game/drive_c/Program Files/{ANIME_GAME_NAME}",
@@ -24,8 +24,13 @@ INSTALL_LOCATIONS = [
     "~/.var/app/com.gitlab.KRypt0n_.an-anime-game-launcher/data/anime-game-launcher"
         f"/game/drive_c/Program Files/{ANIME_GAME_NAME}",
 ]
-CACHE_FILE_PATH = ["".join(["Gen", "shinI", "mpa", "ct_Data"]),
-                   "webCaches", "Cache", "Cache_Data", "data_2"]
+CACHE_FILE_PATH = [
+    b64decode("R2Vuc2hpbkltcGFjdF9EYXRh").decode("utf-8"),
+    "webCaches",
+    "Cache",
+    "Cache_Data",
+    "data_2"
+]
 UID_REGEX = r"\"uid\":\"([0-9]+)\""
 URL_REGEX = r"https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
 API_HOST = "hk4e-api-os.hoyoverse.com"
