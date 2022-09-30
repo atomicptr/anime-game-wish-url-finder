@@ -1,24 +1,28 @@
 #!/usr/bin/env python3
+'''Script to extract the wish url for a certain anime game on Linux '''
 import re
-from pathlib import Path
-from urllib.parse import urlparse, parse_qs, urlencode, unquote, urlunparse
-from operator import itemgetter
-from typing import Optional
-from requests import get as http_get
 import json
+import sys
+from pathlib import Path
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from typing import Optional
+from base64 import b64decode
+from requests import get as http_get
 
 
 DEBUG_MODE = False
-ANIME_GAME_NAME = "".join(["Ge", "nshi", "n I", "mpact"])
+ANIME_GAME_NAME = b64decode("R2Vuc2hpbiBJbXBhY3Q=")
 INSTALL_LOCATIONS = [
     # Anime Game Launcher
-    "~/.local/share/anime-game-launcher/game/drive_c/Program Files/%s" % ANIME_GAME_NAME,
+    f"~/.local/share/anime-game-launcher/game/drive_c/Program Files/{ANIME_GAME_NAME}",
     # Anime Game Launcher GTK
-    "~/.local/share/anime-game-launcher-gtk/game/drive_c/Program Files/%s" % ANIME_GAME_NAME,
+    f"~/.local/share/anime-game-launcher-gtk/game/drive_c/Program Files/{ANIME_GAME_NAME}",
     # Anime Game Launcher GTK - Flatpak
-    "~/.var/app/moe.launcher.an-anime-game-launcher-gtk/data/anime-game-launcher/game/drive_c/Program Files/%s" % ANIME_GAME_NAME,
+    "~/.var/app/moe.launcher.an-anime-game-launcher-gtk/data/anime-game-launcher"
+        f"/game/drive_c/Program Files/{ANIME_GAME_NAME}",
     # Anime Game Launcher - Flatpak
-    "~/.var/app/com.gitlab.KRypt0n_.an-anime-game-launcher/data/anime-game-launcher/game/drive_c/Program Files/%s" % ANIME_GAME_NAME,
+    "~/.var/app/com.gitlab.KRypt0n_.an-anime-game-launcher/data/anime-game-launcher"
+        f"/game/drive_c/Program Files/{ANIME_GAME_NAME}",
 ]
 CACHE_FILE_PATH = ["".join(["Gen", "shinI", "mpa", "ct_Data"]),
                    "webCaches", "Cache", "Cache_Data", "data_2"]
@@ -30,6 +34,7 @@ TIME_CUTOFF_MINUTES = 15
 
 
 def main():
+    '''Main function, go through install locations and look for valid wish urls'''
     found_result = False
 
     for install_location in INSTALL_LOCATIONS:
@@ -37,16 +42,14 @@ def main():
 
         if not install_location.exists():
             if DEBUG_MODE:
-                print(
-                    "Installation '%s' does not exist, skipping..." %
-                    install_location)
+                print(f"Installation '{install_location}' does not exist, skipping...")
             continue
 
         cache_file = install_location.joinpath(*CACHE_FILE_PATH)
 
         if not cache_file.exists():
             if DEBUG_MODE:
-                print("Cache file at '%s' does not exist." % cache_file)
+                print(f"Cache file at '{cache_file}' does not exist.")
             continue
 
         uid, url = find_url(cache_file)
@@ -59,11 +62,14 @@ def main():
         print_result(uid, url)
 
     if not found_result:
-        print("Could not find result, please log into the game, open your wish history and try again.")
-        exit(1)
+        print(
+            "Could not find result, please log into the game, open your wish history and try again."
+        )
+        sys.exit(1)
 
 
 def find_url(path: Path) -> [Optional[str], Optional[str]]:
+    '''Try to find url within cache file'''
     data = path.read_bytes().decode("utf-8", "ignore")
 
     uid = None
@@ -73,8 +79,6 @@ def find_url(path: Path) -> [Optional[str], Optional[str]]:
         uid = res.group(1)
 
     urls = re.findall(URL_REGEX, data)
-
-    matching_urls = []
 
     for url in urls:
         if GACHA_ENDPOINT not in url:
@@ -87,15 +91,15 @@ def find_url(path: Path) -> [Optional[str], Optional[str]]:
 
 
 def test_url(url: str) -> bool:
+    '''Test if the URL parameters are valid'''
     parsed_url = urlparse(url)
     query_params = parse_qs(parsed_url.query)
 
     query_params["lang"] = "en"
-    query_params["init_type"] = 301
     query_params["gacha_type"] = 301
     query_params["size"] = "5"
 
-    test_url = urlunparse(
+    test_api_url = urlunparse(
         (
             parsed_url.scheme,
             API_HOST,
@@ -107,7 +111,7 @@ def test_url(url: str) -> bool:
     )
 
     res = http_get(
-        test_url,
+        test_api_url,
         headers={
             "Content-Type": "application/json",
         },
@@ -116,7 +120,7 @@ def test_url(url: str) -> bool:
     )
 
     if DEBUG_MODE:
-        print("Url: %s\nResponse: %s" % (test_url, res.status_code))
+        print(f"Url: {test_url}\nResponse: {res.status_code}")
 
     if res.status_code != 200:
         return False
@@ -127,10 +131,11 @@ def test_url(url: str) -> bool:
 
 
 def print_result(uid: Optional[str], url: str):
+    '''Print the account uid (if found) and the url to copy'''
     if uid is None:
-        print("\n### URL For Unknown Account:\n\n%s\n" % (uid, url))
+        print(f"\n### URL For Unknown Account:\n\n{url}\n")
         return
-    print("\n### URL For Account '%s':\n\n%s\n" % (uid, url))
+    print(f"\n### URL For Account '{uid}':\n\n{url}\n")
 
 
 if __name__ == "__main__":
